@@ -18,7 +18,8 @@
 │   ├── index.md         # master catalog
 │   ├── concepts/        # topic pages
 │   ├── entities/        # people, tools, papers, orgs
-│   └── summaries/       # one per raw/ source
+│   ├── summaries/       # one per raw/ source
+│   └── themes/          # cross-cutting patterns (≥2 concepts/drafts) — agent surfaces proactively
 └── outputs/
     └── queries/         # Q&A answers; promote durable ones into wiki/
 ```
@@ -27,7 +28,55 @@
 
 - **Pages**: human-readable, hyphenated or Title_Case. Example: `wiki/concepts/transformer-scaling.md` or `wiki/entities/Andrej_Karpathy.md`. Pick one style per wiki and put it in `CLAUDE.md`.
 - **Summaries**: `wiki/summaries/<slug>.md` where `<slug>` matches the raw file (e.g. `raw/articles/karpathy-llm-wiki.md` → `wiki/summaries/karpathy-llm-wiki.md`).
+- **Themes**: `wiki/themes/<pattern-name>.md`. Name the pattern, not the example (`the-partitioning-thesis.md`, not `tool-vs-runtime.md`). Themes generalize; concept pages are specific.
 - **Folder-split concepts**: when a topic exceeds 1200 words, become a subfolder: `wiki/concepts/<topic>/index.md` + `wiki/concepts/<topic>/<aspect>.md` per aspect.
+
+## Themes — the cross-cutting category
+
+`wiki/themes/` holds pages about **patterns that recur across ≥2 concepts, drafts, or summaries**. They're the connective tissue of a body of work: the same argument repeated at different layers, the same opposition surfacing in unrelated posts, a stylistic move that turns out to be the author's signature.
+
+A theme page is not a concept. A concept is *"the specific post I'm going to write."* A theme is *"the pattern that several of my posts share."* They serve different layers of the user's thinking.
+
+**Entry shape** (minimum viable):
+
+```markdown
+# Theme — <Pattern Name>
+
+**Pattern**: One paragraph naming the cross-cutting pattern in the author's voice.
+
+**First noticed**: <date>, while <doing what>.
+
+## Instances
+- [[concept-or-draft-A]] — how this exemplifies the pattern
+- [[concept-or-draft-B]] — ...
+
+## Why this is the user's stance, not generic industry observation
+What makes the cross-instance consistency a *unique-author signal*.
+
+## Potential meta-post
+- Working titles
+- Why it might / might not work as its own essay
+- Status: idea / researching / drafting / shelved / un-meta
+
+## Tracking new instances
+Watch-list for future drafts that may add rows to Instances. Don't fork into a second theme — extend this one.
+
+## Related
+- [[sibling-theme]] · [[parent-theme]]
+```
+
+**Trigger rules** (the agent applies these at step 8 of `ingest` and step 6 of `compile`):
+
+- Catching yourself writing *"this connects to [[X]] and [[Y]]"* in two separate concept pages → theme.
+- Same opposition phrased differently in three drafts → theme.
+- A user comment landing twice on the same observation → theme.
+- A voice signature doing strategic work in multiple posts → theme (this one stays *un-meta* — see "Honest disclaim" pattern from the content-research wiki).
+
+**When NOT to write a theme**:
+
+- One-off observation (no second instance yet) → leave as an open-question bullet on the noticing concept page; promote later.
+- Generic industry observation the user happens to have made once → not a theme; just a fact.
+- Vague vibe with no named pattern → not yet; wait until you can name it.
 
 ## Divide and conquer
 
@@ -113,7 +162,7 @@ Wiki pages cite `[[raw/refs/<slug>]]` exactly like any other source. This keeps 
 > One-sentence scope of the wiki.
 
 ## 🔖 Navigation
-- [[#Concepts]] · [[#Entities]] · [[#Summaries]] · [[#Open Questions]]
+- [[#Concepts]] · [[#Entities]] · [[#Summaries]] · [[#Themes]] · [[#Open Questions]]
 
 ## Concepts
 
@@ -131,6 +180,9 @@ Wiki pages cite `[[raw/refs/<slug>]]` exactly like any other source. This keeps 
 
 ## Summaries (chronological)
 - 2026-04-09 — [[summaries/llm-wiki-gist]] — Karpathy's original Gist
+
+## Themes
+- [[themes/<pattern-name>]] — cross-cutting pattern across ≥2 concepts/drafts
 
 ## Open Questions
 - Q1: ...
