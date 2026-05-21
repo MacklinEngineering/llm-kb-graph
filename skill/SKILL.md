@@ -139,6 +139,40 @@ ki index "<wiki-root>" --description "<one-line description>"
 
 ---
 
+## First moves in any wiki session
+
+**Default opening sequence** — run these before reaching for `find`, `grep`, `ls`, or `Read` of arbitrary wiki files. The index already knows the structure; use it.
+
+```bash
+ki vault list                                # 1. which wikis are indexed?
+ki tree --depth 2                            # 2. shape of every vault (folders + docs, no sections)
+ki tree --at "<vault-or-doc-uri>" --depth 4  # 3. structure of one subtree (folders + docs + sections + LINKS_TO)
+ki search "<question>" --json --k 8          # 4. find relevant sections (most retrieval)
+```
+
+`ki tree --at <doc>` is the move people miss. It shows a document's **section hierarchy + outbound links** without reading the file. Use it before editing any existing concept page, before re-reading any long source, and before restructuring any subtree.
+
+Sample (truncated) of `ki tree --at "transformers-wiki/claude.md" --depth 3`:
+
+```
+Key:  V Vault   F Folder   D Document   S Section   L Links-to
+
+NAME                                             T   URI
+CLAUDE.md ...................................... D   transformers-wiki/claude.md
+  HuggingFace Transformers — schema ............ S   transformers-wiki/claude.md#huggingface-transformers-schema
+    Conventions ................................ S   transformers-wiki/claude.md#...conventions
+    Current categories ......................... S   transformers-wiki/claude.md#...current-categories
+      Concepts ................................. S   transformers-wiki/claude.md#...concepts
+        → attention.md ......................... L   transformers-wiki/raw/articles/attention.md
+        → overview.md .......................... L   transformers-wiki/wiki/concepts/overview.md
+      Entities ................................. S   transformers-wiki/claude.md#...entities
+    Open research questions .................... S   transformers-wiki/claude.md#...open-research-questions
+```
+
+You can copy any URI from the output and feed it straight back into `ki tree --at <uri>` to expand a subtree, or trim the URI to walk *up* the hierarchy (see `~/.claude/skills/ki/SKILL.md` "Walking the URI schema").
+
+---
+
 ## The four operations
 
 Every wiki action is one of these. Each ends with a log entry and (if it changed `raw/` or `wiki/`) an **asynchronous** `ki index <wiki-root>` to keep the graph in sync. The agent kicks indexing off with `run_in_background: true` and surfaces a one-line "✓ ki index done (N docs synced)" when the harness signals completion. See the "Async indexing" rule under `ki integration rules` below for the gating logic.
@@ -155,11 +189,14 @@ Ingest progress:
 - [ ] 2. Convert to markdown if needed (pandoc / markitdown / WebFetch)
 - [ ] 3. File into raw/<articles|papers|notes|refs>/
 - [ ] 4. Read each source in full
+       (if a source is large — >2000 words — and already indexed: `ki tree --at "<source-uri>" --depth 3` first to see its skeleton; read only the relevant sections)
 - [ ] 5. Write wiki/summaries/<slug>.md (200–400 words; key takeaways, not a rewrite)
-- [ ] 6. Update or create relevant wiki/concepts/ and wiki/entities/ pages
-- [ ] 7. Update wiki/index.md (every wiki page appears exactly once)
-- [ ] 8. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
-- [ ] 9. Kick off `ki index <wiki-root>` in background (run_in_background: true). Surface completion notice when it lands.
+- [ ] 6. For each existing wiki/concepts/<X>.md or wiki/entities/<X>.md you're about to update:
+       run `ki tree --at "<X-uri>" --depth 3` first. Shows its current sections + outbound `LINKS_TO` in one round-trip — faster than re-reading the file and integrates cleanly with what's already there.
+- [ ] 7. Update or create relevant wiki/concepts/ and wiki/entities/ pages
+- [ ] 8. Update wiki/index.md (every wiki page appears exactly once)
+- [ ] 9. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
+- [ ] 10. Kick off `ki index <wiki-root>` in background (run_in_background: true). Surface completion notice when it lands.
 ```
 
 Details: `references/ops-guide.md` (article length, wikilink conventions, large-binary refs).
@@ -172,7 +209,7 @@ Workflow:
 
 ```
 Compile progress:
-- [ ] 1. Read CLAUDE.md, wiki/index.md, and the target subtree
+- [ ] 1. Run `ki tree --at "<target-uri>" --depth 4` first. Shows the subtree's actual structure (folders/docs/sections) + every outbound `LINKS_TO`. *Then* read CLAUDE.md, wiki/index.md, and the target files. Don't skip the tree pass — it's how you spot the orphans, the over-deep nesting, the cross-cutting links you'd otherwise miss.
 - [ ] 2. Plan splits (any page > 1200 words → subfolder + index page + sub-pages)
 - [ ] 3. Plan merges (any near-duplicate pairs)
 - [ ] 4. Confirm the plan with the user before writing
@@ -263,12 +300,18 @@ Lint progress:
 
 These are non-negotiable. Violating them silently degrades search.
 
-1. **Async indexing — never block the user.** After any op that wrote to `raw/` or `wiki/`, kick off `ki index <wiki-root>` with `run_in_background: true`. Don't wait for it. Continue with whatever the user wants next. When the harness signals completion, surface a single short line: `✓ ki index done — N docs synced.` Phrase the wait-aware version as the op is wrapping up: "Indexing in the background; I'll let you know when it's caught up."
+1. **Async indexing — never block the user, but serialize.** After any op that wrote to `raw/` or `wiki/`, kick off `ki index <wiki-root>` with `run_in_background: true`. Don't wait for it. Continue with whatever the user wants next. When the harness signals completion, surface a single short line: `✓ ki index done — N docs synced.` Phrase the wait-aware version as the op is wrapping up: "Indexing in the background; I'll let you know when it's caught up."
 
-   **Gating rule — the one time you must wait.** If the user's next action is a `query` op (or anything else that depends on the *fresh* index — e.g. a `lint` looking for stale summaries) **and** there's a still-running background `ki index` from the prior op, await it before running the search. Phrase it: "Indexing from the last op is still finishing — one sec." This is the only scenario where you block; everything else stays async.
+   **Serialization rule — at most one `ki index <vault>` in flight at a time.** This is correctness-critical, not a perf nicety: `ki index` first **wipes the vault subtree** in Neo4j (`DETACH DELETE` of docs / sections / folders / `LINKS_TO`), then re-writes from disk. Two concurrent indexers against the same vault will (a) collide on the wipe and (b) produce an inconsistent final graph because each one's disk snapshot misses the other's writes. **If a new write op completes while a background `ki index` is still running, await the in-flight one before kicking off the next.** Phrase it: "Indexing from the last op is still finishing — queuing the next." Never fire-and-forget a second `ki index` for the same vault.
+
+   **Query gating — the other time you must wait.** While *any* `ki index` is running, the vault is mid-wipe-and-rebuild → `ki search` returns empty / stale results. If the user's next action is a `query` op (or anything else that reads from the graph — `ki tree`, `ki search`, `lint` checks for stale summaries) **and** there's a still-running background `ki index`, await it before running the read. Phrase it: "Indexing from the last op is still finishing — one sec." This is correctness, not politeness.
+
+   **Practical implementation.** Track the in-flight `ki index` bash shell ID per vault for the session. Before any new write-followed-by-index, check whether the prior one is still active (the harness exposes shell status). Before any read against the graph, do the same check. Two simple await points; no queue infrastructure needed.
 2. **For "what did I write about X" / "find me Y in my notes" — use `ki search`, not grep-then-read.** Section-level fulltext returns 3–8 highly relevant chunks at ~100–500 tokens each, vs. reading the wiki/index.md and following links (often 10k–50k tokens). Be honest: when the wiki is tiny (<10 pages), reading `index.md` and the few pages may actually be cheaper — use judgement.
-3. **For structure / "what's in the vault" — use `ki tree`**, not `find` or `ls -R`.
-4. **For "what does this doc link to" — `ki tree --at "<doc-uri>" --depth 1`.** Backlinks ("what links *to* this") are not wired in `ki` yet (issue #35); fall back to `grep -r '\[\[<Page>' <wiki-root>/wiki/`.
+3. **Browse before you read — use `ki tree`, not `ls`/`find`/`Read` on directories.** Two patterns to internalize:
+   - **Before opening a source file** (especially anything large or already indexed): `ki tree --at "<source-uri>" --depth 3` shows the section skeleton + outbound links. Cheap; tells you whether you need to read the whole thing.
+   - **Before editing or restructuring an existing wiki page** (concept, entity, summary): `ki tree --at "<page-uri>" --depth 3` shows what's there *and* what it already links to. Faster than re-reading and ensures you integrate with the existing structure.
+4. **For "what does this doc link to" — that's what `ki tree --at "<doc-uri>" --depth 1` is for** (the `L` rows in the output are outbound `LINKS_TO`). Backlinks ("what links *to* this") are not wired in `ki` yet (issue #35); fall back to `grep -r '\[\[<Page>' <wiki-root>/wiki/`.
 5. **Never claim a `ki` capability that isn't listed in `~/.claude/skills/ki/SKILL.md` "Capabilities not yet wired."** If the user asks for vector search, backlinks, subtree-scoped search, etc., tell them it's on the roadmap and offer the closest wired alternative.
 
 ## `ki` notes — short, honest, opt-out-able
@@ -331,8 +374,11 @@ All three are pure-Python, stdlib-only, idempotent. Always run from `~/.claude/s
 - **Don't edit `raw/`.** It's immutable. Source files only get added, never rewritten. Mutations belong in `wiki/`.
 - **Don't write to `wiki/` without updating `wiki/index.md`.** `lint_wiki.py` will flag it; better not to introduce the drift in the first place.
 - **Don't skip the background `ki index` after a write.** Async is the default, *not* "optional". Stale graph = wrong retrieval next time.
-- **Don't block the user on `ki index`.** Kick it off with `run_in_background: true` and move on. The only time to wait is when the *immediate* next op needs the fresh index (see "Async indexing" gating rule above).
+- **Don't run two `ki index` against the same vault concurrently.** `ki index` is wipe-then-rebuild, not incremental — two in flight will collide on the wipe and corrupt the final graph. Serialize: await the in-flight one before kicking off the next. See "Serialization rule" in `ki integration rules`.
+- **Don't run `ki search` / `ki tree` against a vault that's mid-index.** The wipe-then-rebuild leaves a window where the vault is empty or partial in Neo4j. Reads during that window return stale / empty results. See "Query gating" in `ki integration rules`.
+- **Don't block the user on `ki index` unnecessarily.** Kick it off with `run_in_background: true` and move on. The only times to wait are the two serialization gates above.
 - **Don't introduce symlinks anywhere inside the wiki tree.** Not in `raw/`, not in `wiki/`, not in `outputs/`. Symlinks break in three predictable ways: (a) cloud-sync providers (Drive, Dropbox, iCloud) handle them inconsistently and often de-link them, (b) `ki index` may follow them and ingest out-of-tree content with confusing URIs, (c) moving the wiki to another machine breaks the link silently. **For large external binaries**, use a `raw/refs/<slug>.md` pointer file (YAML front matter with `external_path`) — see `references/wiki-structure.md`. **For sharing content between wikis**, copy it; don't link it.
 - **Don't answer wiki questions from training data.** If `ki search` returns nothing useful, say so and suggest an ingest — don't smuggle in general knowledge as if it came from the wiki.
 - **Don't cram everything into one concept page.** Past ~1200 words, split into a subfolder with an `index.md`. See `references/wiki-structure.md` "Divide and conquer."
 - **Don't read `wiki/**/*.md` exhaustively when `ki search` would do.** Pay attention to wiki size — the cross-over point is somewhere around 10–20 pages.
+- **Don't `ls`, `find`, or `os.listdir` on `raw/` or `wiki/` to figure out what's there.** The index already has the structure. Use `ki tree --depth 2` from the vault root to see the shape, or `ki tree --at "<doc-uri>" --depth 3` to look inside a single document (you get its section hierarchy *and* its outbound `LINKS_TO` for free). Filename heuristics miss both.

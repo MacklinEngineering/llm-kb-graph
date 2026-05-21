@@ -56,7 +56,7 @@ Summary pages are link hubs — every concept and entity referenced should have 
 For each major concept the source introduces or extends:
 
 1. Check if `wiki/concepts/<concept>.md` (or `wiki/concepts/<concept>/index.md`) exists.
-2. If yes: open it, integrate the new material. Add a line under "## Sources" linking back to `[[summaries/<slug>]]`.
+2. If yes: **before opening it for a rewrite, run `ki tree --at "<concept-uri>" --depth 3`.** That gives you the page's section structure *and* its outbound `LINKS_TO` rows in one round-trip — enough to plan the integration without re-reading the full file. Then open the file, integrate the new material, and add a line under "## Sources" linking back to `[[summaries/<slug>]]`.
 3. If no: create it. Use the article template (see "Article structure" below). Add to `wiki/index.md` under the right category.
 4. If the new content pushes the page past 1200 words: trigger a folder-split (see `references/wiki-structure.md` "Divide and conquer"). Confirm with the user before doing the rewrite — splits are expensive to undo.
 
@@ -96,9 +96,10 @@ For every person, tool, paper, or organization named in the source:
 
 1. Update `wiki/index.md` so every new/changed page is listed.
 2. Append a log entry to `<wiki>/.kbw/log/<today>.md`.
-3. Kick off `ki index <wiki-root>` in the background (`run_in_background: true`). Tell the user "indexing in the background — I'll let you know when it's caught up." Don't wait. When the harness signals completion, surface one line: `✓ ki index done — N docs synced`.
+3. **Before kicking off a new `ki index`, check whether a prior background `ki index` for this vault is still running.** If yes, await it — never run two concurrently. `ki index` is wipe-then-rebuild (it `DETACH DELETE`s the vault subtree before re-ingesting), so two in-flight indexers corrupt the graph.
+4. Kick off `ki index <wiki-root>` in the background (`run_in_background: true`). Tell the user "indexing in the background — I'll let you know when it's caught up." Don't wait. When the harness signals completion, surface one line: `✓ ki index done — N docs synced`.
 
-If the user's *immediate* next move is a `query` op (or anything else needing the fresh index), await the background indexer before running search. See the "Async indexing" gating rule in `SKILL.md`.
+If the user's *immediate* next move is a `query` op (or any other read against the graph: `ki search`, `ki tree`, lint's stale-summary check), await the background indexer before running it. During an active `ki index` the vault is wiped-and-being-rebuilt, so reads return empty/stale. See the "Serialization rule" + "Query gating" in `SKILL.md` § ki integration rules.
 
 ## `compile`
 
@@ -111,7 +112,7 @@ Use when no new sources are involved but the existing wiki needs restructuring. 
 
 ### Workflow
 
-1. Read `CLAUDE.md`, `wiki/index.md`, and the target subtree in full.
+1. **`ki tree --at "<target-uri>" --depth 4` first.** The tree shows the subtree's actual folder/doc/section shape plus every outbound `LINKS_TO`. *Then* read `CLAUDE.md`, `wiki/index.md`, and the target files in full. Don't skip the tree pass — it's how you spot the cross-cutting links, over-deep nesting, and orphans you'd miss by reading file-by-file.
 2. Catalog issues:
    - Oversized pages (run `lint_wiki.py` to surface these).
    - Near-duplicate page pairs.
