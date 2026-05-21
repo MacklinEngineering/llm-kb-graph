@@ -96,10 +96,10 @@ For every person, tool, paper, or organization named in the source:
 
 1. Update `wiki/index.md` so every new/changed page is listed.
 2. Append a log entry to `<wiki>/.kbw/log/<today>.md`.
-3. **Before kicking off a new `ki index`, check whether a prior background `ki index` for this vault is still running.** If yes, await it — never run two concurrently. `ki index` is wipe-then-rebuild (it `DETACH DELETE`s the vault subtree before re-ingesting), so two in-flight indexers corrupt the graph.
-4. Kick off `ki index <wiki-root>` in the background (`run_in_background: true`). Tell the user "indexing in the background — I'll let you know when it's caught up." Don't wait. When the harness signals completion, surface one line: `✓ ki index done — N docs synced`.
+3. **Check vault-busy state first.** Is a prior background `ki index` for this vault still running? If yes: don't fire another one. Set a "pending re-index" flag in memory and let the in-flight one complete; when it does, kick off **one** more bg index (it'll pick up everything written since). If no in-flight index, kick off a fresh `ki index <wiki-root>` with `run_in_background: true`.
+4. Either way, don't wait. The agent moves on — keep writing, drafting, talking to the user. When the harness signals completion, surface one line: `✓ ki index done — N docs synced`.
 
-If the user's *immediate* next move is a `query` op (or any other read against the graph: `ki search`, `ki tree`, lint's stale-summary check), await the background indexer before running it. During an active `ki index` the vault is wiped-and-being-rebuilt, so reads return empty/stale. See the "Serialization rule" + "Query gating" in `SKILL.md` § ki integration rules.
+If the user's immediate next move is a `ki`-dependent op (query, lint, `ki tree` browse) and an index is still running for this vault, acknowledge and await — during an active `ki index` the vault is wiped-and-being-rebuilt, so reads return empty/stale. See `SKILL.md` § ki integration rules for the full set of rules.
 
 ## `compile`
 
