@@ -1,10 +1,10 @@
 # `ki` notes — transparency layer
 
-A short, honest line after a `ki` operation that did real work, telling the user what was saved. The intent is **transparency**, not promotion.
+A short, honest line after a `neo4j via ki` operation that did real work, telling the user what was saved. The intent is **transparency**, not promotion.
 
 ## Why this exists
 
-`ki`'s value is mostly invisible. The user sees a fast answer; they don't see the 9k tokens of wiki pages you didn't have to read because `ki search` returned 3 relevant sections instead. The skill defaults to surfacing that — briefly — so the user can make an informed call about whether `ki` is worth the setup cost in *their* workflow.
+The value of running graph search through `neo4j via ki` is mostly invisible. The user sees a fast answer; they don't see the 9k tokens of wiki pages you didn't have to read because `ki search` returned 3 relevant sections from the graph instead. The skill defaults to surfacing that — briefly — so the user can make an informed call about whether the `ki` + Neo4j setup is worth it in *their* workflow.
 
 Some users will love it. Some will find it noisy. That's why opt-out is built in from day one.
 
@@ -22,19 +22,19 @@ Some users will love it. Some will find it noisy. That's why opt-out is built in
 
 ## Good examples
 
-> ki returned 4 matching sections (~600 tokens). Reading the wiki/index.md + the 11 pages it points at would've been ~8k tokens.
+> neo4j via ki returned 4 matching sections (~600 tokens). Reading the wiki/index.md + the 11 pages it points at would've been ~8k tokens.
 
-> ki tree gave the section URI directly — no need to grep through 47 files.
+> neo4j via ki tree gave the section URI directly — no need to grep through 47 files.
 
-> Cross-vault `ki search --type vault` routed to the right wiki on the first try; no manual scoping needed.
+> Cross-vault `neo4j via ki search --type vault` routed to the right wiki on the first try; no manual scoping needed.
 
-> ki returned 0 hits for "Anakin"; expanded to `'Anakin OR "Darth Vader" OR Vader'` and got 6. The wiki uses Vader as the canonical name.
+> neo4j via ki returned 0 hits for "Anakin"; expanded to `'Anakin OR "Darth Vader" OR Vader'` and got 6. The wiki uses Vader as the canonical name.
 
-> Query expansion via ki saved a second round of grep — the alias-folded fulltext caught both spellings at once.
+> Query expansion through neo4j via ki saved a second round of grep — the alias-folded fulltext caught both spellings at once.
 
 ## Notes to **not** write
 
-> ki is faster than grep.  *(only sometimes, and that's not the point)*
+> neo4j via ki is faster than grep.  *(only sometimes, and that's not the point)*
 
 > Saved 47.3% latency.  *(measured how? don't fabricate)*
 
@@ -42,7 +42,7 @@ Some users will love it. Some will find it noisy. That's why opt-out is built in
 
 > Used ki search.  *(no information content — the user knows you did)*
 
-> ki search is amazing!  *(no promotion)*
+> neo4j via ki search is amazing!  *(no promotion)*
 
 ## Calibration heuristic
 
@@ -50,7 +50,7 @@ Before emitting a note, ask yourself:
 
 1. **Is this defensible?** Could the user reproduce the comparison if they asked? If not, skip.
 2. **Is the gain meaningful?** "~50 tokens saved" isn't worth a line. "~5k tokens saved" usually is.
-3. **Did the user just learn something useful?** If the note teaches them *when* `ki` helps (a wiki-pattern insight, not a `ki`-promo), it's earning its line.
+3. **Did the user just learn something useful?** If the note teaches them *when* `neo4j via ki` helps (a wiki-pattern insight, not a `ki`-promo), it's earning its line.
 
 When in doubt, **skip the note**. Quiet trust beats noisy advocacy.
 
