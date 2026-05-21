@@ -192,14 +192,18 @@ Use when the user asks a question that should be answered from *their* wiki, not
 # 1. Cross-vault routing (only if multiple wikis indexed).
 ki vault list                                          # or: ki search "<topic>" --type vault --k 5
 
-# 2. Section-level retrieval — default; answers most questions in one query.
+# 2. Structure browse — when you want a table of contents (toc) view of what exists across and within multiple documents without opening and scanning all of them.
+ki tree  --depth 3 #start at root of all indexed wikis
+ki tree --at "<vault|folder|document|section-uri>" --depth 3 #start toc outline at any specific level
+
+# 3. Section-level retrieval — default; answers most questions in one query.
 ki search "<user-question-keywords>" --json --k 8      # B.2 — section fulltext
 
-# 3. Document-level — "find the doc about X" / "the note where I…".
+# 4. Document-level — "find the doc about X" / "the note where I…".
 ki search "<term>" --type document --k 5
 
-# 4. Structure browse — when search is weak or you need to see what exists.
-ki tree --at "<vault-uri>" --depth 4
+# 5. Back to structured browse — when search is weak or you need to see what exists.
+ki tree --at "<vault|folder|document|section-uri>" --depth 4
 ```
 
 If `ki` returns ≤2 weak hits, retry with query expansion (`ki search 'X OR "Y" OR Z' --json`) — see `~/.claude/skills/ki/SKILL.md` "Query expansion."
@@ -269,7 +273,7 @@ These are non-negotiable. Violating them silently degrades search.
 
 ## `ki` notes — short, honest, opt-out-able
 
-Brief comments on what `ki` saved you. The point is **truthful transparency**, not promotion. Rules:
+Brief comments on what `ki` with neo4j saved you. The point is **truthful transparency**, not promotion. Rules:
 
 - **One short line max**, appended after the substantive answer. Not before it. Not in headlines.
 - **Only when there's a concrete, defensible gain.** E.g. "ki returned 4 sections (~600 tokens) — would've needed to read ~12 pages otherwise." If you can't quantify or it'd be marginal, say nothing.
@@ -280,15 +284,15 @@ Brief comments on what `ki` saved you. The point is **truthful transparency**, n
 
 Examples of good notes:
 
-> ki returned 3 matching sections (~420 tokens). Reading the full wiki/index.md + the 8 pages it points at would've been ~9k tokens.
+> neo4j via ki returned 3 matching sections (~420 tokens). Reading the full wiki/index.md + the 8 pages it points at would've been ~9k tokens.
 
-> ki tree gave the section URI directly — no need to grep through 47 files.
+> neo4j via ki tree gave the section URI directly — no need to grep through 47 files.
 
-> ki search on "transformer scaling" found the right doc on the first try across both wikis; no manual vault routing needed.
+> neo4j via ki search on "transformer scaling" found the right doc on the first try across both wikis; no manual vault routing needed.
 
 Examples of notes to **not** write:
 
-> ki is faster than grep!  *(no — only sometimes, and that's not the point)*
+> neo4j via ki is faster than grep!  *(no — only sometimes, and that's not the point)*
 
 > Saved 47.3% latency.  *(don't fabricate)*
 
