@@ -95,8 +95,10 @@ For every person, tool, paper, or organization named in the source:
 ### After every ingest
 
 1. Update `wiki/index.md` so every new/changed page is listed.
-2. Run `ki index <wiki-root>`.
-3. Append a log entry to `<wiki>/.kbw/log/<today>.md`.
+2. Append a log entry to `<wiki>/.kbw/log/<today>.md`.
+3. Kick off `ki index <wiki-root>` in the background (`run_in_background: true`). Tell the user "indexing in the background — I'll let you know when it's caught up." Don't wait. When the harness signals completion, surface one line: `✓ ki index done — N docs synced`.
+
+If the user's *immediate* next move is a `query` op (or anything else needing the fresh index), await the background indexer before running search. See the "Async indexing" gating rule in `SKILL.md`.
 
 ## `compile`
 
@@ -125,8 +127,8 @@ Use when no new sources are involved but the existing wiki needs restructuring. 
 
 4. Apply, page by page.
 5. Regenerate `wiki/index.md` from scratch (re-walk `wiki/`).
-6. `ki index <wiki-root>`.
-7. Log.
+6. Log.
+7. Kick off `ki index <wiki-root>` in the background. Surface completion when it lands.
 
 ### Splitting a page — mechanics
 
@@ -164,7 +166,7 @@ If `wiki/concepts/transformers.md` is being split:
 6. Synthesize the answer. Cite wiki pages inline as `[[Page]]`. Be specific about which page contributed what.
 7. Write the answer to `outputs/queries/<YYYY-MM-DD>-<slug>.md`.
 8. **Decide if it's durable.** "What does Karpathy think about RAG?" → not durable, lives in outputs/. "How do Karpathy's wiki pattern and RAG compare?" → durable, promote to `wiki/concepts/wiki-vs-rag.md`.
-9. If promoted: update `wiki/index.md`, `ki index <wiki-root>`, log both `query` and `promote`.
+9. If promoted: update `wiki/index.md`, log both `query` and `promote`, kick off `ki index <wiki-root>` in the background.
 
 ### Output formats
 
@@ -192,5 +194,5 @@ After the scripted checks, do a short LLM-side enhancement pass:
 ### After lint
 
 1. Apply fixes per the user's go-aheads.
-2. `ki index <wiki-root>` if anything in `wiki/` changed.
-3. Log: count of issues found and fixed.
+2. Log: count of issues found and fixed.
+3. If anything in `wiki/` changed: kick off `ki index <wiki-root>` in the background. Surface completion when it lands.

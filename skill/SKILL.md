@@ -141,7 +141,7 @@ ki index "<wiki-root>" --description "<one-line description>"
 
 ## The four operations
 
-Every wiki action is one of these. Each ends with a log entry and (if it changed `raw/` or `wiki/`) a `ki index <wiki-root>` to keep the graph in sync.
+Every wiki action is one of these. Each ends with a log entry and (if it changed `raw/` or `wiki/`) an **asynchronous** `ki index <wiki-root>` to keep the graph in sync. The agent kicks indexing off with `run_in_background: true` and surfaces a one-line "✓ ki index done (N docs synced)" when the harness signals completion. See the "Async indexing" rule under `ki integration rules` below for the gating logic.
 
 ### `ingest` — add a new source
 
@@ -158,8 +158,8 @@ Ingest progress:
 - [ ] 5. Write wiki/summaries/<slug>.md (200–400 words; key takeaways, not a rewrite)
 - [ ] 6. Update or create relevant wiki/concepts/ and wiki/entities/ pages
 - [ ] 7. Update wiki/index.md (every wiki page appears exactly once)
-- [ ] 8. ki index <wiki-root>
-- [ ] 9. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
+- [ ] 8. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
+- [ ] 9. Kick off `ki index <wiki-root>` in background (run_in_background: true). Surface completion notice when it lands.
 ```
 
 Details: `references/ops-guide.md` (article length, wikilink conventions, large-binary refs).
@@ -178,8 +178,8 @@ Compile progress:
 - [ ] 4. Confirm the plan with the user before writing
 - [ ] 5. Apply the rewrite
 - [ ] 6. Regenerate wiki/index.md
-- [ ] 7. ki index <wiki-root>
-- [ ] 8. Log: "## [HH:MM] compile | <what changed>"
+- [ ] 7. Log: "## [HH:MM] compile | <what changed>"
+- [ ] 8. Kick off `ki index <wiki-root>` in background. Surface completion when it lands.
 ```
 
 ### `query` — answer questions grounded in the wiki
@@ -214,8 +214,8 @@ Query progress:
 - [ ] 4. Synthesize the answer, citing wiki pages inline as [[Page Name]]
 - [ ] 5. Write to outputs/queries/<YYYY-MM-DD>-<question-slug>.md
 - [ ] 6. If durable (new synthesis, comparison, analysis): promote a cleaned version into wiki/concepts/ and update wiki/index.md
-- [ ] 7. ki index <wiki-root>   (only if you promoted)
-- [ ] 8. Log: "## [HH:MM] query | <question-slug>"  (+ "## [HH:MM] promote | ..." if promoted)
+- [ ] 7. Log: "## [HH:MM] query | <question-slug>"  (+ "## [HH:MM] promote | ..." if promoted)
+- [ ] 8. If you promoted: kick off `ki index <wiki-root>` in background. Surface completion when it lands.
 ```
 
 Output formats beyond markdown — Marp slides, mermaid diagrams, matplotlib charts — are encouraged when the question warrants visual answers. File them under `outputs/<query-slug>/` and link from the query answer.
@@ -249,8 +249,8 @@ Lint progress:
 - [ ] 2. Group findings into: must-fix (dead links, malformed index), should-fix (oversized, stale summaries), enhancement (new article candidates)
 - [ ] 3. Propose fixes per group; confirm with the user before applying
 - [ ] 4. Apply
-- [ ] 5. ki index <wiki-root>   (if anything in wiki/ changed)
-- [ ] 6. Log: "## [HH:MM] lint | <N> issues, <M> fixed"
+- [ ] 5. Log: "## [HH:MM] lint | <N> issues, <M> fixed"
+- [ ] 6. If anything in `wiki/` changed: kick off `ki index <wiki-root>` in background. Surface completion when it lands.
 ```
 
 ---
@@ -259,7 +259,9 @@ Lint progress:
 
 These are non-negotiable. Violating them silently degrades search.
 
-1. **Run `ki index <wiki-root>` after every op that wrote to `raw/` or `wiki/`.** It's idempotent and fast on small deltas.
+1. **Async indexing — never block the user.** After any op that wrote to `raw/` or `wiki/`, kick off `ki index <wiki-root>` with `run_in_background: true`. Don't wait for it. Continue with whatever the user wants next. When the harness signals completion, surface a single short line: `✓ ki index done — N docs synced.` Phrase the wait-aware version as the op is wrapping up: "Indexing in the background; I'll let you know when it's caught up."
+
+   **Gating rule — the one time you must wait.** If the user's next action is a `query` op (or anything else that depends on the *fresh* index — e.g. a `lint` looking for stale summaries) **and** there's a still-running background `ki index` from the prior op, await it before running the search. Phrase it: "Indexing from the last op is still finishing — one sec." This is the only scenario where you block; everything else stays async.
 2. **For "what did I write about X" / "find me Y in my notes" — use `ki search`, not grep-then-read.** Section-level fulltext returns 3–8 highly relevant chunks at ~100–500 tokens each, vs. reading the wiki/index.md and following links (often 10k–50k tokens). Be honest: when the wiki is tiny (<10 pages), reading `index.md` and the few pages may actually be cheaper — use judgement.
 3. **For structure / "what's in the vault" — use `ki tree`**, not `find` or `ls -R`.
 4. **For "what does this doc link to" — `ki tree --at "<doc-uri>" --depth 1`.** Backlinks ("what links *to* this") are not wired in `ki` yet (issue #35); fall back to `grep -r '\[\[<Page>' <wiki-root>/wiki/`.
@@ -324,7 +326,9 @@ All three are pure-Python, stdlib-only, idempotent. Always run from `~/.claude/s
 
 - **Don't edit `raw/`.** It's immutable. Source files only get added, never rewritten. Mutations belong in `wiki/`.
 - **Don't write to `wiki/` without updating `wiki/index.md`.** `lint_wiki.py` will flag it; better not to introduce the drift in the first place.
-- **Don't skip `ki index` after a write.** Stale graph = wrong retrieval next time.
+- **Don't skip the background `ki index` after a write.** Async is the default, *not* "optional". Stale graph = wrong retrieval next time.
+- **Don't block the user on `ki index`.** Kick it off with `run_in_background: true` and move on. The only time to wait is when the *immediate* next op needs the fresh index (see "Async indexing" gating rule above).
+- **Don't introduce symlinks anywhere inside the wiki tree.** Not in `raw/`, not in `wiki/`, not in `outputs/`. Symlinks break in three predictable ways: (a) cloud-sync providers (Drive, Dropbox, iCloud) handle them inconsistently and often de-link them, (b) `ki index` may follow them and ingest out-of-tree content with confusing URIs, (c) moving the wiki to another machine breaks the link silently. **For large external binaries**, use a `raw/refs/<slug>.md` pointer file (YAML front matter with `external_path`) — see `references/wiki-structure.md`. **For sharing content between wikis**, copy it; don't link it.
 - **Don't answer wiki questions from training data.** If `ki search` returns nothing useful, say so and suggest an ingest — don't smuggle in general knowledge as if it came from the wiki.
 - **Don't cram everything into one concept page.** Past ~1200 words, split into a subfolder with an `index.md`. See `references/wiki-structure.md` "Divide and conquer."
 - **Don't read `wiki/**/*.md` exhaustively when `ki search` would do.** Pay attention to wiki size — the cross-over point is somewhere around 10–20 pages.

@@ -79,9 +79,15 @@ For math, use KaTeX delimiters: `$inline$` and `$$block$$`.
 
 Both render in Obsidian with default settings, in GitHub's markdown viewer, and in most static-site generators.
 
-## Large binaries — never in `raw/`
+## Large binaries — never in `raw/`, never as a symlink
 
-Anything over ~10 MB (videos, model weights, large PDFs, datasets) lives outside the wiki. Create a pointer file at `raw/refs/<slug>.md`:
+Anything over ~10 MB (videos, model weights, large PDFs, datasets) lives outside the wiki. **Never symlink them in.** Symlinks fail in three predictable ways:
+
+- Cloud-sync (Drive, Dropbox, iCloud) handles them inconsistently and often de-links on sync.
+- `ki index` may follow them and ingest out-of-tree content with confusing URIs.
+- Moving the wiki to another machine breaks the link silently.
+
+Instead, create a pointer file at `raw/refs/<slug>.md`:
 
 ```markdown
 ---
