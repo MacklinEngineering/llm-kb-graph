@@ -26,6 +26,7 @@ DIRS = [
     "wiki/concepts",
     "wiki/entities",
     "wiki/summaries",
+    "wiki/themes",
     "outputs/queries",
 ]
 
@@ -51,6 +52,9 @@ CLAUDE_MD_TEMPLATE = """# {topic} — schema
 
 ### Summaries
 - (none yet)
+
+### Themes
+- (none yet — cross-cutting patterns the agent surfaces during ingest/compile)
 
 ## Recurring sources
 
@@ -79,7 +83,7 @@ INDEX_MD_TEMPLATE = """# Index — {topic}
 > {description}
 
 ## 🔖 Navigation
-- [[#Concepts]] · [[#Entities]] · [[#Summaries]] · [[#Open Questions]]
+- [[#Concepts]] · [[#Entities]] · [[#Summaries]] · [[#Themes]] · [[#Open Questions]]
 
 ## Concepts
 
@@ -90,6 +94,12 @@ INDEX_MD_TEMPLATE = """# Index — {topic}
 (none yet)
 
 ## Summaries (chronological)
+
+(none yet)
+
+## Themes
+
+*Cross-cutting patterns recurring across multiple drafts/concepts. The agent surfaces these proactively during ingest/compile.*
 
 (none yet)
 

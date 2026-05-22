@@ -107,7 +107,8 @@ Every wiki is one folder on disk. The skill works with this exact layout:
 │   ├── index.md              # master catalog — every page listed exactly once
 │   ├── concepts/             # topic pages (split into subfolders past ~1200 words)
 │   ├── entities/             # people, tools, papers, organizations
-│   └── summaries/            # one summary page per source in raw/
+│   ├── summaries/            # one summary page per source in raw/
+│   └── themes/               # cross-cutting patterns the agent surfaces proactively (see "Surfacing themes" below)
 └── outputs/
     └── queries/              # Q&A answers; durable ones get promoted into wiki/
 ```
@@ -221,9 +222,10 @@ Ingest progress:
 - [ ] 6. For each existing wiki/concepts/<X>.md or wiki/entities/<X>.md you're about to update:
        run `ki tree --at "<X-uri>" --depth 3` first. Shows its current sections + outbound `LINKS_TO` in one round-trip — faster than re-reading the file and integrates cleanly with what's already there.
 - [ ] 7. Update or create relevant wiki/concepts/ and wiki/entities/ pages
-- [ ] 8. Update wiki/index.md (every wiki page appears exactly once)
-- [ ] 9. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
-- [ ] 10. Kick off `ki index <wiki-root>` in background (run_in_background: true). Surface completion notice when it lands.
+- [ ] 8. **Scan for cross-cutting themes** — does this ingest reveal a pattern that connects ≥2 existing concepts/drafts (the same argument at different layers; the same opposition recurring; a recurring stylistic move)? If yes, write or update `wiki/themes/<slug>.md`. **Don't bury the observation as an open-question bullet** — themes are a first-class category. See "Surfacing themes proactively" below.
+- [ ] 9. Update wiki/index.md (every wiki page appears exactly once)
+- [ ] 10. Log: "## [HH:MM] ingest | <slug> — <one-line> (touched N pages)"
+- [ ] 11. Kick off `ki index <wiki-root>` in background (run_in_background: true). Surface completion notice when it lands.
 ```
 
 Details: `references/ops-guide.md` (article length, wikilink conventions, large-binary refs).
@@ -241,9 +243,10 @@ Compile progress:
 - [ ] 3. Plan merges (any near-duplicate pairs)
 - [ ] 4. Confirm the plan with the user before writing
 - [ ] 5. Apply the rewrite
-- [ ] 6. Regenerate wiki/index.md
-- [ ] 7. Log: "## [HH:MM] compile | <what changed>"
-- [ ] 8. Kick off `ki index <wiki-root>` in background. Surface completion when it lands.
+- [ ] 6. **Scan for cross-cutting themes** — a compile pass is a natural moment to surface (or refine) themes; restructured content often makes patterns visible that were buried before. Write or update `wiki/themes/<slug>.md` as needed. See "Surfacing themes proactively" below.
+- [ ] 7. Regenerate wiki/index.md
+- [ ] 8. Log: "## [HH:MM] compile | <what changed>"
+- [ ] 9. Kick off `ki index <wiki-root>` in background. Surface completion when it lands.
 ```
 
 ### `query` — answer questions grounded in the wiki
@@ -320,6 +323,78 @@ Lint progress:
 - [ ] 5. Log: "## [HH:MM] lint | <N> issues, <M> fixed"
 - [ ] 6. If anything in `wiki/` changed: kick off `ki index <wiki-root>` in background. Surface completion when it lands.
 ```
+
+---
+
+## Surfacing themes proactively
+
+A **theme** is a cross-cutting pattern that recurs across multiple concept pages, drafts, or summaries — the same argument repeated at different layers, the same opposition surfacing in unrelated posts, a recurring stylistic move that turns out to be the author's signature. Themes are a **first-class category** alongside Concepts / Entities / Summaries. They live at `wiki/themes/<slug>.md`.
+
+**Why themes matter:** the most valuable observations an agent can make during ingest aren't *more concepts* — they're the connective tissue between concepts. Authors developing a body of work often don't see their own patterns until something names them. The agent is in a uniquely good position to notice (it's reading everything fresh, every session).
+
+**The mistake to avoid:** when you spot a cross-cutting pattern mid-draft, **don't bury it as a one-line bullet under "Open questions"** on whichever concept page noticed it. That makes it un-findable, un-developable, and signals to the user that the observation is provisional. It's not. Promote it to a theme page immediately.
+
+### When to write a theme
+
+Default: at step 8 of `ingest` and step 6 of `compile`, ask yourself — *does this observation connect ≥2 existing concepts/drafts? Does it feel like the user's stance, not just a generic industry observation?* If yes on both, write a stub. Five minutes of stub-writing during ingest is worth more than thirty minutes of archaeological rediscovery three months later.
+
+Concrete triggers:
+
+- You catch yourself writing "this connects to [[X]] and [[Y]]" in two separate concept pages → theme.
+- You notice the same opposition (e.g., *"don't own the substrate"*) phrased differently in three drafts → theme.
+- A user comment lands twice in different conversations on the same observation → theme.
+- A voice signature (a recurring stylistic move) is doing strategic work in multiple posts → theme.
+
+### What a theme page contains
+
+Minimum viable shape:
+
+```markdown
+# Theme — <Pattern Name>
+
+**Pattern**: One-paragraph statement of the cross-cutting pattern in the author's voice.
+
+**First noticed**: <date>, while <doing what>.
+
+## Instances
+- [[concept-or-draft-A]] — how this exemplifies the pattern
+- [[concept-or-draft-B]] — how this exemplifies the pattern
+- [[concept-or-draft-C]] — ...
+
+## Why this is the author's stance, not generic industry observation
+What makes the cross-layer / cross-instance consistency a *unique-author signal*, not just a common framing.
+
+## Potential meta-post
+- Working titles
+- Why it might / might not work as its own essay
+- Status (idea / researching / drafting / shelved / un-meta)
+
+## Tracking new instances
+Watch-list for future drafts that may add rows to the Instances list. Don't fork into a second theme — extend this one.
+
+## Related
+- [[sibling-theme-1]]
+- [[parent-theme]] (if this is a sub-pattern of a larger theme)
+```
+
+### Theme vs. Concept vs. Open Question
+
+| Surface | Use when | Lifetime |
+|---|---|---|
+| `wiki/concepts/<slug>.md` | One specific post idea | Days to weeks (until published/shelved) |
+| `wiki/themes/<slug>.md` | A pattern across ≥2 concepts | Months to years (compounds as instances accumulate) |
+| Open Question bullet | A question whose *answer* hasn't surfaced yet | Until answered, then promote or delete |
+
+If an observation has named instances, it's a theme. If it's a question without instances, it's an open question. If it's a single specific post idea, it's a concept.
+
+### Don't over-stub
+
+A theme worth a page is one that:
+- Connects ≥2 drafts/concepts (not a one-off observation).
+- Feels like *the user's stance*, not a general industry framing they happened to use once.
+- Has at least a working title or named pattern (don't write themes about vague vibes).
+
+When in doubt: write the stub. A two-row theme with three bullets beats an unwritten observation by a wide margin.
 
 ---
 
@@ -418,3 +493,5 @@ All three are pure-Python, stdlib-only, idempotent. Always run from `~/.claude/s
 - **Don't answer wiki questions from training data.** If `ki search` returns nothing useful, say so and suggest an ingest — don't smuggle in general knowledge as if it came from the wiki.
 - **Don't cram everything into one concept page.** Past ~1200 words, split into a subfolder with an `index.md`. See `references/wiki-structure.md` "Divide and conquer."
 - **Don't default to `Read` / `ls` / `find` / `grep` over `wiki/` when an indexed `ki tree` or `ki search` would do.** This is the single biggest agent-behavior trap. The "Default-to-`ki` substitution table" near the top of this file is the canonical list; consult it before reaching for file-ops. Cross-over to direct reads is around 10–20 pages of wiki, when reading the whole thing is cheaper than two tool calls.
+- **Don't bury cross-cutting observations as open-question bullets.** If you notice a pattern that connects ≥2 concepts/drafts, it's a theme — write `wiki/themes/<slug>.md`. See "Surfacing themes proactively."
+- **Don't `ls`, `find`, or `os.listdir` on `raw/` or `wiki/` to figure out what's there.** The index already has the structure. Use `ki tree --depth 2` from the vault root to see the shape, or `ki tree --at "<doc-uri>" --depth 3` to look inside a single document (you get its section hierarchy *and* its outbound `LINKS_TO` for free). Filename heuristics miss both.
