@@ -58,6 +58,34 @@ Once `ki vault list` returns cleanly, move on. Report one line: "✓ `ki` ready 
 
 The agent-facing `ki` rules at `~/.claude/skills/ki/SKILL.md` are non-negotiable. This skill calls `ki search`, `ki tree`, `ki index`, `ki vault list`, and never bypasses them.
 
+## What `ki` actually gives you (vs. file-ops + grep)
+
+`ki search` is a fulltext index. Lucene gives you that for free; it's not the reason to use `ki`. **The reason to use `ki` is `ki tree` and the graph-shape primitives it exposes.**
+
+Concrete: `ki tree --at "<doc-uri>" --depth 3` returns, in one call:
+
+- Every section heading of the doc (the per-doc table of contents)
+- Every outbound `LINKS_TO` edge — both internal wikilinks AND external URLs — *organized by which section authored each link*
+- The doc's place in the containment hierarchy (Vault → Folder → Document → Section)
+
+To get the same picture from file-ops you'd need: `Read` the file, scan for headings, grep for `[[X]]` wikilinks, grep for `[label](url)` external links, then mentally organize who-cites-what. That's three or four tool calls collapsed into one, with the structural relationships preserved.
+
+**This is the value-prop. `ki search` is a nice-to-have on top of it.**
+
+### Default-to-`ki` substitution table
+
+When working inside a ki-indexed wiki, default to the **right** column. Reach for the left only if you have a specific reason.
+
+| Instead of...                          | Do this                                          | Why                                                                  |
+|----------------------------------------|--------------------------------------------------|----------------------------------------------------------------------|
+| `ls wiki/concepts/`                    | `ki tree --at "<vault>/wiki/concepts" --depth 2` | One call: folder + child docs + their top sections                   |
+| `Read wiki/concepts/foo.md` (full)     | `ki tree --at "<vault>/wiki/concepts/foo.md" --depth 3` | Section outline + outbound `LINKS_TO` without reading the body |
+| `Read wiki/concepts/foo.md` (one part) | `ki get "<section-uri>" --type content`          | Returns the specific section, not the whole doc                      |
+| `grep -r "X" wiki/`                    | `ki search "X" --types section --json`           | Section-granular, ranked, ~15–25% of content tokens vs reading whole |
+| `find wiki/ -name "*foo*"`             | `ki search "foo" --types document --json`        | Doc-level fulltext (titles + aliases) instead of filename guessing   |
+
+**The default is the right column. The exception requires a reason.** Reasonable reasons: the wiki is tiny (<10 pages, reading is cheaper); the file was just written this turn and isn't in the index yet; the user explicitly asked for a raw filesystem view.
+
 ## Directory layout
 
 Every wiki is one folder on disk. The skill works with this exact layout:
@@ -189,8 +217,7 @@ Ingest progress:
 - [ ] 1. Identify source(s): inbox/, a path the user gave, a URL, a paste
 - [ ] 2. Convert to markdown if needed (pandoc / markitdown / WebFetch)
 - [ ] 3. File into raw/<articles|papers|notes|refs>/
-- [ ] 4. Read each source in full
-       (if a source is large — >2000 words — and already indexed: `ki tree --at "<source-uri>" --depth 3` first to see its skeleton; read only the relevant sections)
+- [ ] 4. **First**: `ki tree --at "<source-uri>" --depth 3` to see the section skeleton AND outbound `LINKS_TO` (internal + external) in one call. **Then**: `ki get "<section-uri>" --type content` for the sections you need, or `Read` the file if you genuinely need the whole body. Skipping the tree pass is the wrong default — it's cheap, and it tells you what to ignore. Exception: a source that hasn't been indexed yet (just dropped into `raw/inbox/`) — read it directly, since the index doesn't know about it until the next `ki index` settles.
 - [ ] 5. Write wiki/summaries/<slug>.md (200–400 words; key takeaways, not a rewrite)
 - [ ] 6. For each existing wiki/concepts/<X>.md or wiki/entities/<X>.md you're about to update:
        run `ki tree --at "<X-uri>" --depth 3` first. Shows its current sections + outbound `LINKS_TO` in one round-trip — faster than re-reading the file and integrates cleanly with what's already there.
@@ -211,7 +238,7 @@ Workflow:
 
 ```
 Compile progress:
-- [ ] 1. Run `ki tree --at "<target-uri>" --depth 4` first. Shows the subtree's actual structure (folders/docs/sections) + every outbound `LINKS_TO`. *Then* read CLAUDE.md, wiki/index.md, and the target files. Don't skip the tree pass — it's how you spot the orphans, the over-deep nesting, the cross-cutting links you'd otherwise miss.
+- [ ] 1. **First**: `ki tree --at "<target-uri>" --depth 4` to see the subtree's actual structure (folders/docs/sections) + every outbound `LINKS_TO`. *Then* — and only then — read `CLAUDE.md`, `wiki/index.md`, and any target files you still need. The tree pass is non-skippable: it's how you spot the orphans, the over-deep nesting, the cross-cutting links you'd otherwise miss. Reading the files first burns context on stuff the tree would have told you to skip.
 - [ ] 2. Plan splits (any page > 1200 words → subfolder + index page + sub-pages)
 - [ ] 3. Plan merges (any near-duplicate pairs)
 - [ ] 4. Confirm the plan with the user before writing
@@ -465,6 +492,6 @@ All three are pure-Python, stdlib-only, idempotent. Always run from `~/.claude/s
 - **Don't introduce symlinks anywhere inside the wiki tree.** Not in `raw/`, not in `wiki/`, not in `outputs/`. Symlinks break in three predictable ways: (a) cloud-sync providers (Drive, Dropbox, iCloud) handle them inconsistently and often de-link them, (b) `ki index` may follow them and ingest out-of-tree content with confusing URIs, (c) moving the wiki to another machine breaks the link silently. **For large external binaries**, use a `raw/refs/<slug>.md` pointer file (YAML front matter with `external_path`) — see `references/wiki-structure.md`. **For sharing content between wikis**, copy it; don't link it.
 - **Don't answer wiki questions from training data.** If `ki search` returns nothing useful, say so and suggest an ingest — don't smuggle in general knowledge as if it came from the wiki.
 - **Don't cram everything into one concept page.** Past ~1200 words, split into a subfolder with an `index.md`. See `references/wiki-structure.md` "Divide and conquer."
+- **Don't default to `Read` / `ls` / `find` / `grep` over `wiki/` when an indexed `ki tree` or `ki search` would do.** This is the single biggest agent-behavior trap. The "Default-to-`ki` substitution table" near the top of this file is the canonical list; consult it before reaching for file-ops. Cross-over to direct reads is around 10–20 pages of wiki, when reading the whole thing is cheaper than two tool calls.
 - **Don't bury cross-cutting observations as open-question bullets.** If you notice a pattern that connects ≥2 concepts/drafts, it's a theme — write `wiki/themes/<slug>.md`. See "Surfacing themes proactively."
-- **Don't read `wiki/**/*.md` exhaustively when `ki search` would do.** Pay attention to wiki size — the cross-over point is somewhere around 10–20 pages.
 - **Don't `ls`, `find`, or `os.listdir` on `raw/` or `wiki/` to figure out what's there.** The index already has the structure. Use `ki tree --depth 2` from the vault root to see the shape, or `ki tree --at "<doc-uri>" --depth 3` to look inside a single document (you get its section hierarchy *and* its outbound `LINKS_TO` for free). Filename heuristics miss both.
