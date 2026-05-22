@@ -32,6 +32,9 @@ Keep it short (under 200 lines). Anything longer belongs in `wiki/` or in anothe
 ### Summaries
 - one per raw/ source
 
+### Themes
+- cross-cutting patterns across ≥2 concepts/drafts (agent surfaces these proactively during ingest/compile; see references/wiki-structure.md "Themes")
+
 ## Recurring sources
 
 <filled in by the agent based on the user's step-5 choices in first-run flow>
